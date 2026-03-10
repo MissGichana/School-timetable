@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School Timetable System</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎓 School Timetable System</h1>
+            <p class="subtitle">Spring 2026 Semester</p>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab-button active" onclick="switchTab('dashboard')">Dashboard</button>
+            <button class="tab-button" onclick="switchTab('admin')">Admin Panel</button>
+            <button class="tab-button" onclick="switchTab('instructor')">Instructor View</button>
+            <button class="tab-button" onclick="switchTab('student')">Student View</button>
+        </nav>
+
+        <!-- ============ DASHBOARD TAB ============ -->
+        <section id="dashboard" class="tab-content active">
+            <h2>Dashboard</h2>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Total Courses</h3>
+                    <p class="stat-number" id="totalCourses">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Instructors</h3>
+                    <p class="stat-number" id="totalInstructors">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Classrooms</h3>
+                    <p class="stat-number" id="totalClassrooms">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Scheduled Classes</h3>
+                    <p class="stat-number" id="scheduledClasses">0</p>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>Complete Timetable</h3>
+                <div id="timetableContainer" class="timetable-container">
+                    <table class="timetable">
+                        <thead>
+                            <tr>
+                                <th>Course</th>
+                                <th>Instructor</th>
+                                <th>Day</th>
+                                <th>Time</th>
+                                <th>Room</th>
+                                <th>Capacity</th>
+                            </tr>
+                        </thead>
+                        <tbody id="timetableBody">
+                            <tr><td colspan="6">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <h3>Instructor Workload</h3>
+                    <div id="workloadChart"></div>
+                </div>
+                <div class="chart-container">
+                    <h3>Classroom Utilization</h3>
+                    <div id="utilizationChart"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============ ADMIN PANEL TAB ============ -->
+        <section id="admin" class="tab-content">
+            <h2>Admin Panel</h2>
+            
+            <div class="admin-section">
+                <h3>Schedule Management</h3>
+                <div class="button-group">
+                    <button class="btn btn-success" onclick="generateSchedule()">Generate Schedule</button>
+                    <button class="btn btn-danger" onclick="clearSchedule()">Clear Schedule</button>
+                </div>
+                <div id="generationReport" style="margin-top: 20px;"></div>
+            </div>
+
+            <div class="admin-section">
+                <h3>Add New Instructor</h3>
+                <form onsubmit="addInstructor(event)">
+                    <input type="text" placeholder="Instructor Name" id="instructorName" required>
+                    <input type="email" placeholder="Email" id="instructorEmail" required>
+                    <input type="text" placeholder="Department" id="instructorDept" required>
+                    <button type="submit" class="btn btn-primary">Add Instructor</button>
+                </form>
+            </div>
+
+            <div class="admin-section">
+                <h3>Add New Course</h3>
+                <form onsubmit="addCourse(event)">
+                    <input type="text" placeholder="Course Code" id="courseCode" required>
+                    <input type="text" placeholder="Course Name" id="courseName" required>
+                    <input type="number" placeholder="Credits" id="courseCredits" required>
+                    <input type="number" placeholder="Capacity" id="courseCapacity" required>
+                    <input type="text" placeholder="Department" id="courseDept" required>
+                    <button type="submit" class="btn btn-primary">Add Course</button>
+                </form>
+            </div>
+
+            <div class="admin-section">
+                <h3>Add New Classroom</h3>
+                <form onsubmit="addClassroom(event)">
+                    <input type="text" placeholder="Room Number" id="roomNumber" required>
+                    <input type="number" placeholder="Capacity" id="roomCapacity" required>
+                    <input type="text" placeholder="Resources" id="roomResources">
+                    <button type="submit" class="btn btn-primary">Add Classroom</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- ============ INSTRUCTOR VIEW TAB ============ -->
+        <section id="instructor" class="tab-content">
+            <h2>Instructor View</h2>
+            
+            <div class="section">
+                <label>Select Instructor:</label>
+                <select id="instructorSelect" onchange="loadInstructorSchedule()">
+                    <option value="">-- Choose an instructor --</option>
+                </select>
+            </div>
+
+            <div id="instructorScheduleContainer" style="display:none;">
+                <h3 id="instructorName"></h3>
+                <table class="timetable">
+                    <thead>
+                        <tr>
+                            <th>Course</th>
+                            <th>Day</th>
+                            <th>Time</th>
+                            <th>Room</th>
+                            <th>Duration</th>
+                        </tr>
+                    </thead>
+                    <tbody id="instructorScheduleBody">
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ============ STUDENT VIEW TAB ============ -->
+        <section id="student" class="tab-content">
+            <h2>Student View</h2>
+            
+            <div class="section">
+                <label>Select Student:</label>
+                <select id="studentSelect" onchange="loadStudentSchedule()">
+                    <option value="">-- Choose a student --</option>
+                </select>
+            </div>
+
+            <div id="studentScheduleContainer" style="display:none;">
+                <h3 id="studentName"></h3>
+                <table class="timetable">
+                    <thead>
+                        <tr>
+                            <th>Course</th>
+                            <th>Instructor</th>
+                            <th>Day</th>
+                            <th>Time</th>
+                            <th>Room</th>
+                        </tr>
+                    </thead>
+                    <tbody id="studentScheduleBody">
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
