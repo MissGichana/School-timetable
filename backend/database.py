@@ -1,7 +1,7 @@
 import sqlite3
 import os
 from datetime import datetime
-from backend.config import Config
+from config import Config
 
 class Database:
     """Database connection and management"""

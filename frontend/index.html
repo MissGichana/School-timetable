@@ -104,8 +104,8 @@
                 <form onsubmit="addCourse(event)">
                     <input type="text" placeholder="Course Code" id="courseCode" required>
                     <input type="text" placeholder="Course Name" id="courseName" required>
-                    <input type="number" placeholder="Credits" id="courseCredits" required>
-                    <input type="number" placeholder="Capacity" id="courseCapacity" required>
+                    <input type="number" placeholder="Credits" id="courseCredits" min="0" required>
+                    <input type="number" placeholder="Capacity" id="courseCapacity" min="0" required>
                     <input type="text" placeholder="Department" id="courseDept" required>
                     <button type="submit" class="btn btn-primary">Add Course</button>
                 </form>

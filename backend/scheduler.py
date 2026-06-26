@@ -1,7 +1,7 @@
 import random
-from backend.database import Database
-from backend.conflict_detector import ConflictDetector
-from backend.config import Config
+from database import Database
+from conflict_detector import ConflictDetector
+from config import Config
 
 class Scheduler:
     """Intelligent scheduling algorithm"""
