@@ -1,9 +1,10 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from backend.config import Config
-from backend.database import Database
-from backend.scheduler import Scheduler
-from backend.conflict_detector import ConflictDetector
+from config import Config
+from database import Database
+from scheduler import Scheduler
+from conflict_detector import ConflictDetector
+import os
 
 app = Flask(__name__)
 CORS(app)

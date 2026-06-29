@@ -1,5 +1,5 @@
-from backend.database import Database
-from backend.config import Config
+from database import Database
+from config import Config
 
 class ConflictDetector:
     """Detects scheduling conflicts"""
