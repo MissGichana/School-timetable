@@ -1,3 +1,5 @@
+import os
+from datetime import datetime
 
 class Config:
     """Configuration for the application"""
@@ -6,8 +8,15 @@ class Config:
     DATABASE_PATH = os.path.join(os.path.dirname(__file__), '../database/timetable.db')
     
     # Flask
-    DEBUG = True
-    TESTING = False
+    DEBUG = os.getenv('FLASK_DEBUG', 'False') == 'True'
+    TESTING = os.getenv('TESTING', 'False') == 'True'
+    
+    # Server Configuration
+    HOST = os.getenv('FLASK_HOST', '0.0.0.0')
+    PORT = int(os.getenv('FLASK_PORT', 5000))
+    
+    # Frontend URL for CORS
+    FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
     
     # Application settings
     SEMESTER = "Spring 2026"
@@ -24,3 +33,7 @@ class Config:
     # Instructor constraints
     MAX_CLASSES_PER_INSTRUCTOR = 5
     MIN_CLASSES_PER_INSTRUCTOR = 3
+    
+    # Logging
+    LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+    LOG_FILE = os.path.join(os.path.dirname(__file__), '../logs/app.log')

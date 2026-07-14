@@ -1,17 +1,40 @@
+import logging
+import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import dotenv # pyright: ignore[reportMissingImports]
 from backend.config import Config
 from backend.database import Database
 from backend.scheduler import Scheduler
 from backend.conflict_detector import ConflictDetector
 
+# Load environment variables
+dotenv.load_dotenv()
+
+# Setup logging
+logging.basicConfig(level=Config.LOG_LEVEL)
+logger = logging.getLogger(__name__)
+
 app = Flask(__name__)
-CORS(app)
+
+# Configure CORS with specific frontend URL
+CORS(app, resources={
+    r"/api/*": {
+        "origins": [Config.FRONTEND_URL, "http://localhost:3000", "http://localhost:5000"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type"]
+    }
+})
 
 # Initialize services
-db = Database()
-scheduler = Scheduler()
-conflict_detector = ConflictDetector()
+try:
+    db = Database()
+    scheduler = Scheduler()
+    conflict_detector = ConflictDetector()
+    logger.info("Services initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize services: {e}")
+    raise
 
 # ==================== ADMIN ENDPOINTS ====================
 
@@ -19,19 +42,23 @@ conflict_detector = ConflictDetector()
 def generate_schedule():
     """Generate complete timetable"""
     try:
+        logger.info("Generating schedule...")
         result = scheduler.generate_schedule()
         return jsonify(result), 200
     except Exception as e:
+        logger.error(f"Error in generate_schedule: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/admin/clear-schedule', methods=['POST'])
 def clear_schedule():
     """Clear all schedules"""
     try:
+        logger.info("Clearing schedule...")
         db.execute_query("DELETE FROM schedules")
         db.execute_query("DELETE FROM conflicts")
         return jsonify({'success': True, 'message': 'Schedule cleared'}), 200
     except Exception as e:
+        logger.error(f"Error in clear_schedule: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/admin/add-instructor', methods=['POST'])
@@ -39,12 +66,17 @@ def add_instructor():
     """Add new instructor"""
     try:
         data = request.json
+        if not data or 'name' not in data or 'email' not in data or 'department' not in data:
+            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+        
+        logger.info(f"Adding instructor: {data['name']}")
         db.execute_query(
             "INSERT INTO instructors (name, email, department) VALUES (?, ?, ?)",
             (data['name'], data['email'], data['department'])
         )
         return jsonify({'success': True, 'message': 'Instructor added'}), 201
     except Exception as e:
+        logger.error(f"Error in add_instructor: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/admin/add-course', methods=['POST'])
@@ -52,12 +84,18 @@ def add_course():
     """Add new course"""
     try:
         data = request.json
+        required = ['code', 'name', 'credits', 'capacity', 'department']
+        if not data or not all(field in data for field in required):
+            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+        
+        logger.info(f"Adding course: {data['code']}")
         db.execute_query(
             "INSERT INTO courses (code, name, credits, capacity, department) VALUES (?, ?, ?, ?, ?)",
             (data['code'], data['name'], data['credits'], data['capacity'], data['department'])
         )
         return jsonify({'success': True, 'message': 'Course added'}), 201
     except Exception as e:
+        logger.error(f"Error in add_course: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/admin/add-classroom', methods=['POST'])
@@ -65,12 +103,17 @@ def add_classroom():
     """Add new classroom"""
     try:
         data = request.json
+        if not data or 'room_number' not in data or 'capacity' not in data:
+            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+        
+        logger.info(f"Adding classroom: {data['room_number']}")
         db.execute_query(
             "INSERT INTO classrooms (room_number, capacity, resources) VALUES (?, ?, ?)",
             (data['room_number'], data['capacity'], data.get('resources', ''))
         )
         return jsonify({'success': True, 'message': 'Classroom added'}), 201
     except Exception as e:
+        logger.error(f"Error in add_classroom: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/admin/set-instructor-availability', methods=['POST'])
@@ -78,12 +121,18 @@ def set_instructor_availability():
     """Set instructor availability"""
     try:
         data = request.json
+        required = ['instructor_id', 'day', 'available']
+        if not data or not all(field in data for field in required):
+            return jsonify({'success': False, 'error': 'Missing required fields'}), 400
+        
+        logger.info(f"Updating availability for instructor {data['instructor_id']} on {data['day']}")
         db.execute_query(
             "UPDATE instructor_availability SET available = ? WHERE instructor_id = ? AND day = ?",
             (data['available'], data['instructor_id'], data['day'])
         )
         return jsonify({'success': True, 'message': 'Availability updated'}), 200
     except Exception as e:
+        logger.error(f"Error in set_instructor_availability: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 # ==================== DATA RETRIEVAL ENDPOINTS ====================
@@ -96,6 +145,7 @@ def get_instructors():
         result = [dict(inst) for inst in instructors]
         return jsonify(result), 200
     except Exception as e:
+        logger.error(f"Error in get_instructors: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/courses', methods=['GET'])
@@ -106,6 +156,7 @@ def get_courses():
         result = [dict(course) for course in courses]
         return jsonify(result), 200
     except Exception as e:
+        logger.error(f"Error in get_courses: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/classrooms', methods=['GET'])
@@ -116,6 +167,7 @@ def get_classrooms():
         result = [dict(room) for room in classrooms]
         return jsonify(result), 200
     except Exception as e:
+        logger.error(f"Error in get_classrooms: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/schedules', methods=['GET'])
@@ -134,6 +186,7 @@ def get_schedules():
         result = [dict(row) for row in schedules]
         return jsonify(result), 200
     except Exception as e:
+        logger.error(f"Error in get_schedules: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/instructor/<int:instructor_id>/schedule', methods=['GET'])
@@ -157,6 +210,7 @@ def get_instructor_schedule(instructor_id):
         }
         return jsonify(result), 200
     except Exception as e:
+        logger.error(f"Error in get_instructor_schedule: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/student/<int:student_id>/schedule', methods=['GET'])
@@ -182,6 +236,7 @@ def get_student_schedule(student_id):
         }
         return jsonify(result), 200
     except Exception as e:
+        logger.error(f"Error in get_student_schedule: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/conflicts', methods=['GET'])
@@ -200,6 +255,7 @@ def get_conflicts():
         result = [dict(row) for row in conflicts]
         return jsonify(result), 200
     except Exception as e:
+        logger.error(f"Error in get_conflicts: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/students', methods=['GET'])
@@ -210,6 +266,7 @@ def get_students():
         result = [dict(student) for student in students]
         return jsonify(result), 200
     except Exception as e:
+        logger.error(f"Error in get_students: {e}")
         return jsonify({'error': str(e)}), 500
 
 # ==================== STATISTICS ENDPOINTS ====================
@@ -221,6 +278,7 @@ def get_instructor_workload():
         workload = scheduler.get_instructor_workload()
         return jsonify(workload), 200
     except Exception as e:
+        logger.error(f"Error in get_instructor_workload: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/stats/classroom-utilization', methods=['GET'])
@@ -230,6 +288,7 @@ def get_classroom_utilization():
         utilization = scheduler.get_classroom_utilization()
         return jsonify(utilization), 200
     except Exception as e:
+        logger.error(f"Error in get_classroom_utilization: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/stats/dashboard', methods=['GET'])
@@ -242,12 +301,13 @@ def get_dashboard_stats():
         scheduled_classes = db.fetch_one("SELECT COUNT(*) as count FROM schedules")
         
         return jsonify({
-            'total_courses': total_courses['count'],
-            'total_instructors': total_instructors['count'],
-            'total_classrooms': total_classrooms['count'],
-            'scheduled_classes': scheduled_classes['count']
+            'total_courses': total_courses['count'] if total_courses else 0,
+            'total_instructors': total_instructors['count'] if total_instructors else 0,
+            'total_classrooms': total_classrooms['count'] if total_classrooms else 0,
+            'scheduled_classes': scheduled_classes['count'] if scheduled_classes else 0
         }), 200
     except Exception as e:
+        logger.error(f"Error in get_dashboard_stats: {e}")
         return jsonify({'error': str(e)}), 500
 
 # ==================== HEALTH CHECK ====================
@@ -255,17 +315,20 @@ def get_dashboard_stats():
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
-    return jsonify({'status': 'ok'}), 200
+    return jsonify({'status': 'ok', 'message': 'Server is running'}), 200
 
 # ==================== ERROR HANDLERS ====================
 
 @app.errorhandler(404)
 def not_found(error):
+    logger.warning(f"404 error: {error}")
     return jsonify({'error': 'Not found'}), 404
 
 @app.errorhandler(500)
 def server_error(error):
+    logger.error(f"500 error: {error}")
     return jsonify({'error': 'Server error'}), 500
 
 if __name__ == '__main__':
-    app.run(debug=Config.DEBUG, host='0.0.0.0', port=5000)
+    logger.info(f"Starting Flask app on {Config.HOST}:{Config.PORT}")
+    app.run(debug=Config.DEBUG, host=Config.HOST, port=Config.PORT, threaded=True)

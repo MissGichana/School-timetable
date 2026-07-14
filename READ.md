@@ -1,17 +1,24 @@
-# School Timetable System
+## School Timetable System - Genetic Algorithm Implementation
 
-A comprehensive timetabling system for school undergraduate final project.
+## 📋 Project Overview
 
-## Features
+A complete timetable generation system for schools/universities using Genetic Algorithm to intelligently schedule courses, instructors, and classrooms while respecting all constraints.
 
-- 15 Courses scheduling
-- 7 Instructors management
-- 5 Classrooms allocation
-- Time slots from 8 AM to 5 PM (1 PM - 2 PM lunch break)
-- Minimum 2-hour class duration
-- Conflict detection and resolution
-- Intelligent scheduling algorithm
-- Admin interface
-- Instructor and Student views
+## ✨ Features
 
-## Project Structure
+### Core Features
+- ✅ **Genetic Algorithm Scheduling** - Intelligent constraint-aware scheduling
+- ✅ **Admin Panel** - Add/manage courses, instructors, classrooms
+- ✅ **Conflict Detection** - Automatic identification of scheduling conflicts
+- ✅ **Multi-view Dashboard** - Admin, Instructor, and Student views
+- ✅ **Statistics & Analytics** - Workload and utilization reports
+
+### Constraints Handled
+- No instructor teaches 2 courses simultaneously
+- No room books 2 courses simultaneously
+- Room capacity must accommodate class size
+- Instructors available only on specified days
+- Classes don't overlap with lunch time (1-2 PM)
+- Minimum class duration requirements
+
+## 🏗️ Project Structure
