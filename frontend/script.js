@@ -1,5 +1,90 @@
 const API_BASE_URL = 'http://127.0.0.1:5000/api';
 
+// ============ ERROR HANDLING & RETRY LOGIC ============
+
+/**
+ * fetchWithRetry - Fetch with automatic retry logic
+ * @param {string} url - API endpoint URL
+ * @param {object} options - Fetch options
+ * @param {number} maxRetries - Number of retry attempts (default: 3)
+ * @returns {Promise} Response object
+ */
+async function fetchWithRetry(url, options = {}, maxRetries = 3) {
+    let lastError;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const response = await fetch(url, options);
+            
+            // Check for HTTP errors
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            return response;
+        } catch (error) {
+            lastError = error;
+            console.warn(`Fetch attempt ${attempt}/${maxRetries} failed for ${url}:`, error.message);
+            
+            // Don't retry on last attempt
+            if (attempt < maxRetries) {
+                // Exponential backoff: 1s, 2s, 4s
+                const delay = Math.pow(2, attempt - 1) * 1000;
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+    }
+    
+    throw new Error(`Failed to fetch ${url} after ${maxRetries} attempts. Last error: ${lastError.message}`);
+}
+
+/**
+ * escapeHtml - Escape HTML special characters to prevent XSS
+ * @param {string} text - Text to escape
+ * @returns {string} Escaped text
+ */
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+/**
+ * showAlert - Display user-friendly alert messages
+ * @param {string} message - Alert message
+ * @param {string} type - Alert type (success, error, warning, info)
+ * @param {number} duration - Display duration in ms (default: 5000)
+ */
+function showAlert(message, type = 'info', duration = 5000) {
+    const alertDiv = document.getElementById('alertContainer') || createAlertContainer();
+    
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type}`;
+    alert.innerHTML = `
+        <span>${escapeHtml(message)}</span>
+        <button class="alert-close" onclick="this.parentElement.remove()">×</button>
+    `;
+    
+    alertDiv.appendChild(alert);
+    
+    // Auto-remove after duration
+    if (duration > 0) {
+        setTimeout(() => alert.remove(), duration);
+    }
+}
+
+/**
+ * createAlertContainer - Create alert container if it doesn't exist
+ */
+function createAlertContainer() {
+    const container = document.createElement('div');
+    container.id = 'alertContainer';
+    container.className = 'alert-container';
+    document.body.prepend(container);
+    return container;
+}
+
 // ============ TAB SWITCHING ============
 
 function switchTab(tabName) {
@@ -32,7 +117,7 @@ function switchTab(tabName) {
 async function loadDashboard() {
     try {
         // Load statistics
-        const statsResponse = await fetch(`${API_BASE_URL}/stats/dashboard`);
+        const statsResponse = await fetchWithRetry(`${API_BASE_URL}/stats/dashboard`);
         const stats = await statsResponse.json();
         
         document.getElementById('totalCourses').textContent = stats.total_courses;
@@ -41,21 +126,22 @@ async function loadDashboard() {
         document.getElementById('scheduledClasses').textContent = stats.scheduled_classes;
         
         // Load timetable
-        loadTimetable();
+        await loadTimetable();
         
         // Load workload chart
-        loadWorkloadChart();
+        await loadWorkloadChart();
         
         // Load utilization chart
-        loadUtilizationChart();
+        await loadUtilizationChart();
     } catch (error) {
         console.error('Error loading dashboard:', error);
+        showAlert(`Dashboard load failed: ${error.message}`, 'error');
     }
 }
 
 async function loadTimetable() {
     try {
-        const response = await fetch(`${API_BASE_URL}/schedules`);
+        const response = await fetchWithRetry(`${API_BASE_URL}/schedules`);
         const schedules = await response.json();
         
         const tbody = document.getElementById('timetableBody');
@@ -69,23 +155,24 @@ async function loadTimetable() {
         schedules.forEach(schedule => {
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td><strong>${schedule.course_code}</strong><br>${schedule.course_name}</td>
-                <td>${schedule.instructor_name}</td>
-                <td>${schedule.day}</td>
-                <td>${schedule.start_time} - ${schedule.end_time}</td>
-                <td>${schedule.classroom_name}</td>
-                <td>${schedule.duration_hours} hrs</td>
+                <td><strong>${escapeHtml(schedule.course_code)}</strong><br>${escapeHtml(schedule.course_name)}</td>
+                <td>${escapeHtml(schedule.instructor_name)}</td>
+                <td>${escapeHtml(schedule.day)}</td>
+                <td>${escapeHtml(schedule.start_time)} - ${escapeHtml(schedule.end_time)}</td>
+                <td>${escapeHtml(schedule.classroom_name)}</td>
+                <td>${escapeHtml(schedule.duration_hours)} hrs</td>
             `;
             tbody.appendChild(row);
         });
     } catch (error) {
         console.error('Error loading timetable:', error);
+        showAlert(`Timetable load failed: ${error.message}`, 'error');
     }
 }
 
 async function loadWorkloadChart() {
     try {
-        const response = await fetch(`${API_BASE_URL}/stats/instructor-workload`);
+        const response = await fetchWithRetry(`${API_BASE_URL}/stats/instructor-workload`);
         const workload = await response.json();
         
         const chartDiv = document.getElementById('workloadChart');
@@ -99,8 +186,8 @@ async function loadWorkloadChart() {
             const row = document.createElement('tr');
             const barWidth = (item.classes / 5) * 100;
             row.innerHTML = `
-                <td><strong>${item.instructor_name}</strong></td>
-                <td>${item.classes}</td>
+                <td><strong>${escapeHtml(item.instructor_name)}</strong></td>
+                <td>${escapeHtml(item.classes)}</td>
                 <td><div style="background: linear-gradient(90deg, #3498db, #2ecc71); width: ${barWidth}%; height: 20px; border-radius: 3px;"></div></td>
             `;
             table.appendChild(row);
@@ -109,12 +196,13 @@ async function loadWorkloadChart() {
         chartDiv.appendChild(table);
     } catch (error) {
         console.error('Error loading workload chart:', error);
+        showAlert(`Workload chart load failed: ${error.message}`, 'error');
     }
 }
 
 async function loadUtilizationChart() {
     try {
-        const response = await fetch(`${API_BASE_URL}/stats/classroom-utilization`);
+        const response = await fetchWithRetry(`${API_BASE_URL}/stats/classroom-utilization`);
         const utilization = await response.json();
         
         const chartDiv = document.getElementById('utilizationChart');
@@ -127,9 +215,9 @@ async function loadUtilizationChart() {
         utilization.forEach(item => {
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td><strong>${item.classroom_name}</strong></td>
-                <td>${item.classes}</td>
-                <td>${item.capacity}</td>
+                <td><strong>${escapeHtml(item.classroom_name)}</strong></td>
+                <td>${escapeHtml(item.classes)}</td>
+                <td>${escapeHtml(item.capacity)}</td>
             `;
             table.appendChild(row);
         });
@@ -137,6 +225,7 @@ async function loadUtilizationChart() {
         chartDiv.appendChild(table);
     } catch (error) {
         console.error('Error loading utilization chart:', error);
+        showAlert(`Utilization chart load failed: ${error.message}`, 'error');
     }
 }
 
@@ -144,7 +233,7 @@ async function loadUtilizationChart() {
 
 async function generateSchedule() {
     try {
-        const response = await fetch(`${API_BASE_URL}/admin/generate-schedule`, {
+        const response = await fetchWithRetry(`${API_BASE_URL}/admin/generate-schedule`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -163,19 +252,21 @@ async function generateSchedule() {
                 <h4>✓ Schedule Generated Successfully!</h4>
                 <p><strong>Scheduled Courses:</strong> ${result.scheduled_courses} / ${result.total_courses}</p>
                 ${result.failed_courses.length > 0 ? `<p><strong>Failed to Schedule:</strong> ${result.failed_courses.join(', ')}</p>` : ''}
-                <p>${result.message}</p>
+                <p>${escapeHtml(result.message)}</p>
             `;
+            showAlert('Schedule generated successfully!', 'success');
         } else {
             reportDiv.classList.add('error');
             reportDiv.classList.remove('success');
-            reportDiv.innerHTML = `<h4>✗ Error: ${result.message}</h4>`;
+            reportDiv.innerHTML = `<h4>✗ Error: ${escapeHtml(result.message)}</h4>`;
+            showAlert(`Error: ${result.message}`, 'error');
         }
         
         // Reload dashboard
-        loadDashboard();
+        await loadDashboard();
     } catch (error) {
         console.error('Error generating schedule:', error);
-        alert('Error generating schedule: ' + error.message);
+        showAlert(`Schedule generation failed: ${error.message}`, 'error');
     }
 }
 
@@ -183,19 +274,21 @@ async function clearSchedule() {
     if (!confirm('Are you sure you want to clear all schedules?')) return;
     
     try {
-        const response = await fetch(`${API_BASE_URL}/admin/clear-schedule`, {
+        const response = await fetchWithRetry(`${API_BASE_URL}/admin/clear-schedule`, {
             method: 'POST'
         });
         
         const result = await response.json();
         
         if (result.success) {
-            alert('Schedule cleared successfully!');
-            loadDashboard();
+            showAlert('Schedule cleared successfully!', 'success');
+            await loadDashboard();
+        } else {
+            showAlert(`Error: ${result.message}`, 'error');
         }
     } catch (error) {
         console.error('Error clearing schedule:', error);
-        alert('Error clearing schedule');
+        showAlert(`Clear schedule failed: ${error.message}`, 'error');
     }
 }
 
@@ -208,8 +301,14 @@ async function addInstructor(event) {
         department: document.getElementById('instructorDept').value
     };
     
+    // Validate input
+    if (!data.name || !data.email || !data.department) {
+        showAlert('All fields are required!', 'warning');
+        return;
+    }
+    
     try {
-        const response = await fetch(`${API_BASE_URL}/admin/add-instructor`, {
+        const response = await fetchWithRetry(`${API_BASE_URL}/admin/add-instructor`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -220,13 +319,14 @@ async function addInstructor(event) {
         const result = await response.json();
         
         if (result.success) {
-            alert('Instructor added successfully!');
+            showAlert('Instructor added successfully!', 'success');
             event.target.reset();
         } else {
-            alert('Error adding instructor: ' + result.error);
+            showAlert(`Error: ${result.error}`, 'error');
         }
     } catch (error) {
         console.error('Error:', error);
+        showAlert(`Add instructor failed: ${error.message}`, 'error');
     }
 }
 
@@ -241,8 +341,19 @@ async function addCourse(event) {
         department: document.getElementById('courseDept').value
     };
     
+    // Validate input
+    if (!data.code || !data.name || !data.credits || !data.capacity || !data.department) {
+        showAlert('All fields are required!', 'warning');
+        return;
+    }
+    
+    if (data.credits <= 0 || data.capacity <= 0) {
+        showAlert('Credits and capacity must be greater than 0!', 'warning');
+        return;
+    }
+    
     try {
-        const response = await fetch(`${API_BASE_URL}/admin/add-course`, {
+        const response = await fetchWithRetry(`${API_BASE_URL}/admin/add-course`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -253,13 +364,14 @@ async function addCourse(event) {
         const result = await response.json();
         
         if (result.success) {
-            alert('Course added successfully!');
+            showAlert('Course added successfully!', 'success');
             event.target.reset();
         } else {
-            alert('Error adding course: ' + result.error);
+            showAlert(`Error: ${result.error}`, 'error');
         }
     } catch (error) {
         console.error('Error:', error);
+        showAlert(`Add course failed: ${error.message}`, 'error');
     }
 }
 
@@ -272,8 +384,19 @@ async function addClassroom(event) {
         resources: document.getElementById('roomResources').value
     };
     
+    // Validate input
+    if (!data.room_number || !data.capacity) {
+        showAlert('Room number and capacity are required!', 'warning');
+        return;
+    }
+    
+    if (data.capacity <= 0) {
+        showAlert('Capacity must be greater than 0!', 'warning');
+        return;
+    }
+    
     try {
-        const response = await fetch(`${API_BASE_URL}/admin/add-classroom`, {
+        const response = await fetchWithRetry(`${API_BASE_URL}/admin/add-classroom`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -284,13 +407,14 @@ async function addClassroom(event) {
         const result = await response.json();
         
         if (result.success) {
-            alert('Classroom added successfully!');
+            showAlert('Classroom added successfully!', 'success');
             event.target.reset();
         } else {
-            alert('Error adding classroom: ' + result.error);
+            showAlert(`Error: ${result.error}`, 'error');
         }
     } catch (error) {
         console.error('Error:', error);
+        showAlert(`Add classroom failed: ${error.message}`, 'error');
     }
 }
 
@@ -298,7 +422,7 @@ async function addClassroom(event) {
 
 async function loadInstructorSelect() {
     try {
-        const response = await fetch(`${API_BASE_URL}/instructors`);
+        const response = await fetchWithRetry(`${API_BASE_URL}/instructors`);
         const instructors = await response.json();
         
         const select = document.getElementById('instructorSelect');
@@ -307,11 +431,12 @@ async function loadInstructorSelect() {
         instructors.forEach(instructor => {
             const option = document.createElement('option');
             option.value = instructor.id;
-            option.textContent = instructor.name;
+            option.textContent = escapeHtml(instructor.name);
             select.appendChild(option);
         });
     } catch (error) {
         console.error('Error loading instructors:', error);
+        showAlert(`Load instructors failed: ${error.message}`, 'error');
     }
 }
 
@@ -324,10 +449,10 @@ async function loadInstructorSchedule() {
     }
     
     try {
-        const response = await fetch(`${API_BASE_URL}/instructor/${instructorId}/schedule`);
+        const response = await fetchWithRetry(`${API_BASE_URL}/instructor/${instructorId}/schedule`);
         const data = await response.json();
         
-        document.getElementById('instructorName').textContent = data.instructor?.name || 'Unknown';
+        document.getElementById('instructorName').textContent = escapeHtml(data.instructor?.name || 'Unknown');
         
         const tbody = document.getElementById('instructorScheduleBody');
         tbody.innerHTML = '';
@@ -338,11 +463,11 @@ async function loadInstructorSchedule() {
             data.schedule.forEach(schedule => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td><strong>${schedule.course_code}</strong><br>${schedule.course_name}</td>
-                    <td>${schedule.day}</td>
-                    <td>${schedule.start_time} - ${schedule.end_time}</td>
-                    <td>${schedule.classroom_name}</td>
-                    <td>${schedule.duration_hours} hrs</td>
+                    <td><strong>${escapeHtml(schedule.course_code)}</strong><br>${escapeHtml(schedule.course_name)}</td>
+                    <td>${escapeHtml(schedule.day)}</td>
+                    <td>${escapeHtml(schedule.start_time)} - ${escapeHtml(schedule.end_time)}</td>
+                    <td>${escapeHtml(schedule.classroom_name)}</td>
+                    <td>${escapeHtml(schedule.duration_hours)} hrs</td>
                 `;
                 tbody.appendChild(row);
             });
@@ -351,6 +476,7 @@ async function loadInstructorSchedule() {
         document.getElementById('instructorScheduleContainer').style.display = 'block';
     } catch (error) {
         console.error('Error loading instructor schedule:', error);
+        showAlert(`Load instructor schedule failed: ${error.message}`, 'error');
     }
 }
 
@@ -358,7 +484,7 @@ async function loadInstructorSchedule() {
 
 async function loadStudentSelect() {
     try {
-        const response = await fetch(`${API_BASE_URL}/students`);
+        const response = await fetchWithRetry(`${API_BASE_URL}/students`);
         const students = await response.json();
         
         const select = document.getElementById('studentSelect');
@@ -367,11 +493,12 @@ async function loadStudentSelect() {
         students.forEach(student => {
             const option = document.createElement('option');
             option.value = student.id;
-            option.textContent = `${student.name} (${student.student_id})`;
+            option.textContent = `${escapeHtml(student.name)} (${escapeHtml(student.student_id)})`;
             select.appendChild(option);
         });
     } catch (error) {
         console.error('Error loading students:', error);
+        showAlert(`Load students failed: ${error.message}`, 'error');
     }
 }
 
@@ -384,10 +511,10 @@ async function loadStudentSchedule() {
     }
     
     try {
-        const response = await fetch(`${API_BASE_URL}/student/${studentId}/schedule`);
+        const response = await fetchWithRetry(`${API_BASE_URL}/student/${studentId}/schedule`);
         const data = await response.json();
         
-        document.getElementById('studentName').textContent = data.student?.name || 'Unknown';
+        document.getElementById('studentName').textContent = escapeHtml(data.student?.name || 'Unknown');
         
         const tbody = document.getElementById('studentScheduleBody');
         tbody.innerHTML = '';
@@ -398,11 +525,11 @@ async function loadStudentSchedule() {
             data.schedule.forEach(schedule => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td><strong>${schedule.course_code}</strong><br>${schedule.course_name}</td>
-                    <td>${schedule.instructor_name}</td>
-                    <td>${schedule.day}</td>
-                    <td>${schedule.start_time} - ${schedule.end_time}</td>
-                    <td>${schedule.classroom_name}</td>
+                    <td><strong>${escapeHtml(schedule.course_code)}</strong><br>${escapeHtml(schedule.course_name)}</td>
+                    <td>${escapeHtml(schedule.instructor_name)}</td>
+                    <td>${escapeHtml(schedule.day)}</td>
+                    <td>${escapeHtml(schedule.start_time)} - ${escapeHtml(schedule.end_time)}</td>
+                    <td>${escapeHtml(schedule.classroom_name)}</td>
                 `;
                 tbody.appendChild(row);
             });
@@ -411,6 +538,7 @@ async function loadStudentSchedule() {
         document.getElementById('studentScheduleContainer').style.display = 'block';
     } catch (error) {
         console.error('Error loading student schedule:', error);
+        showAlert(`Load student schedule failed: ${error.message}`, 'error');
     }
 }
 
