@@ -237,7 +237,8 @@ async function generateSchedule() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
-            }
+            },
+            body: JSON.stringify({})
         });
         
         const result = await response.json();
@@ -251,15 +252,15 @@ async function generateSchedule() {
             reportDiv.innerHTML = `
                 <h4>✓ Schedule Generated Successfully!</h4>
                 <p><strong>Scheduled Courses:</strong> ${result.scheduled_courses} / ${result.total_courses}</p>
-                ${result.failed_courses.length > 0 ? `<p><strong>Failed to Schedule:</strong> ${result.failed_courses.join(', ')}</p>` : ''}
+                ${result.failed_courses && result.failed_courses.length > 0 ? `<p><strong>Failed to Schedule:</strong> ${result.failed_courses.join(', ')}</p>` : ''}
                 <p>${escapeHtml(result.message)}</p>
             `;
             showAlert('Schedule generated successfully!', 'success');
         } else {
             reportDiv.classList.add('error');
             reportDiv.classList.remove('success');
-            reportDiv.innerHTML = `<h4>✗ Error: ${escapeHtml(result.message)}</h4>`;
-            showAlert(`Error: ${result.message}`, 'error');
+            reportDiv.innerHTML = `<h4>✗ Error: ${escapeHtml(result.message || result.error)}</h4>`;
+            showAlert(`Error: ${result.message || result.error}`, 'error');
         }
         
         // Reload dashboard
@@ -275,7 +276,11 @@ async function clearSchedule() {
     
     try {
         const response = await fetchWithRetry(`${API_BASE_URL}/admin/clear-schedule`, {
-            method: 'POST'
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({})
         });
         
         const result = await response.json();
@@ -284,7 +289,7 @@ async function clearSchedule() {
             showAlert('Schedule cleared successfully!', 'success');
             await loadDashboard();
         } else {
-            showAlert(`Error: ${result.message}`, 'error');
+            showAlert(`Error: ${result.message || result.error}`, 'error');
         }
     } catch (error) {
         console.error('Error clearing schedule:', error);
