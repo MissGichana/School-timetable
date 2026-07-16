@@ -5,6 +5,11 @@ from database import Database
 from scheduler import Scheduler
 from conflict_detector import ConflictDetector
 import os
+import logging
+
+# Setup logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CORS(app)
@@ -20,20 +25,26 @@ conflict_detector = ConflictDetector()
 def generate_schedule():
     """Generate complete timetable"""
     try:
+        logger.info("Starting schedule generation...")
         result = scheduler.generate_schedule()
+        logger.info(f"Schedule generation result: {result}")
         return jsonify(result), 200
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        logger.error(f"Error in generate_schedule: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e), 'message': f'Schedule generation failed: {str(e)}'}), 500
 
 @app.route('/api/admin/clear-schedule', methods=['POST'])
 def clear_schedule():
     """Clear all schedules"""
     try:
+        logger.info("Clearing schedules...")
         db.execute_query("DELETE FROM schedules")
         db.execute_query("DELETE FROM conflicts")
+        logger.info("Schedules cleared successfully")
         return jsonify({'success': True, 'message': 'Schedule cleared'}), 200
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        logger.error(f"Error in clear_schedule: {str(e)}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e), 'message': f'Clear failed: {str(e)}'}), 500
 
 @app.route('/api/admin/add-instructor', methods=['POST'])
 def add_instructor():
@@ -46,6 +57,7 @@ def add_instructor():
         )
         return jsonify({'success': True, 'message': 'Instructor added'}), 201
     except Exception as e:
+        logger.error(f"Error in add_instructor: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/admin/add-course', methods=['POST'])
@@ -59,6 +71,7 @@ def add_course():
         )
         return jsonify({'success': True, 'message': 'Course added'}), 201
     except Exception as e:
+        logger.error(f"Error in add_course: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/admin/add-classroom', methods=['POST'])
@@ -72,6 +85,7 @@ def add_classroom():
         )
         return jsonify({'success': True, 'message': 'Classroom added'}), 201
     except Exception as e:
+        logger.error(f"Error in add_classroom: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/admin/set-instructor-availability', methods=['POST'])
@@ -85,6 +99,7 @@ def set_instructor_availability():
         )
         return jsonify({'success': True, 'message': 'Availability updated'}), 200
     except Exception as e:
+        logger.error(f"Error in set_instructor_availability: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
 # ==================== DATA RETRIEVAL ENDPOINTS ====================
@@ -97,6 +112,7 @@ def get_instructors():
         result = [dict(inst) for inst in instructors]
         return jsonify(result), 200
     except Exception as e:
+        logger.error(f"Error in get_instructors: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/courses', methods=['GET'])
@@ -107,6 +123,7 @@ def get_courses():
         result = [dict(course) for course in courses]
         return jsonify(result), 200
     except Exception as e:
+        logger.error(f"Error in get_courses: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/classrooms', methods=['GET'])
@@ -117,6 +134,7 @@ def get_classrooms():
         result = [dict(room) for room in classrooms]
         return jsonify(result), 200
     except Exception as e:
+        logger.error(f"Error in get_classrooms: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/schedules', methods=['GET'])
@@ -135,6 +153,7 @@ def get_schedules():
         result = [dict(row) for row in schedules]
         return jsonify(result), 200
     except Exception as e:
+        logger.error(f"Error in get_schedules: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/instructor/<int:instructor_id>/schedule', methods=['GET'])
@@ -158,6 +177,7 @@ def get_instructor_schedule(instructor_id):
         }
         return jsonify(result), 200
     except Exception as e:
+        logger.error(f"Error in get_instructor_schedule: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/student/<int:student_id>/schedule', methods=['GET'])
@@ -183,6 +203,7 @@ def get_student_schedule(student_id):
         }
         return jsonify(result), 200
     except Exception as e:
+        logger.error(f"Error in get_student_schedule: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/conflicts', methods=['GET'])
@@ -201,6 +222,7 @@ def get_conflicts():
         result = [dict(row) for row in conflicts]
         return jsonify(result), 200
     except Exception as e:
+        logger.error(f"Error in get_conflicts: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/students', methods=['GET'])
@@ -211,6 +233,7 @@ def get_students():
         result = [dict(student) for student in students]
         return jsonify(result), 200
     except Exception as e:
+        logger.error(f"Error in get_students: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 # ==================== STATISTICS ENDPOINTS ====================
@@ -222,6 +245,7 @@ def get_instructor_workload():
         workload = scheduler.get_instructor_workload()
         return jsonify(workload), 200
     except Exception as e:
+        logger.error(f"Error in get_instructor_workload: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/stats/classroom-utilization', methods=['GET'])
@@ -231,6 +255,7 @@ def get_classroom_utilization():
         utilization = scheduler.get_classroom_utilization()
         return jsonify(utilization), 200
     except Exception as e:
+        logger.error(f"Error in get_classroom_utilization: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/stats/dashboard', methods=['GET'])
@@ -249,6 +274,7 @@ def get_dashboard_stats():
             'scheduled_classes': scheduled_classes['count']
         }), 200
     except Exception as e:
+        logger.error(f"Error in get_dashboard_stats: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 # ==================== HEALTH CHECK ====================
@@ -266,7 +292,9 @@ def not_found(error):
 
 @app.errorhandler(500)
 def server_error(error):
+    logger.error(f"Server error: {str(error)}", exc_info=True)
     return jsonify({'error': 'Server error'}), 500
 
 if __name__ == '__main__':
+    logger.info("Starting Flask application...")
     app.run(debug=Config.DEBUG, host='0.0.0.0', port=5000)
